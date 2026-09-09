@@ -1,0 +1,23 @@
+QR JELENLÉT – TELEPÍTHETŐ WEBAPP (PWA)
+
+1. A csomag fájljait egy HTTPS-es webhelyre kell feltölteni ugyanabba a mappába:
+   - index.html
+   - manifest.webmanifest
+   - service-worker.js
+   - icon.svg
+
+2. Android / Chrome:
+   - Nyisd meg a webcímet.
+   - A böngésző menüjében válaszd: „Telepítés” / „Alkalmazás telepítése”
+     vagy az alkalmazáson belüli „Telepítés” gombot.
+   - Ezután külön ikon jelenik meg a kezdőképernyőn.
+
+3. Az adatok minden változtatás után automatikusan mentődnek az eszközön.
+   A kurzusok, névsorok és alkalmak az app újranyitásakor visszatöltődnek.
+
+4. Biztonság:
+   A „Kurzusok / Mentés” oldalon időnként készíts „Teljes mentés (.json)” fájlt.
+   Ez másik telefonra vagy böngészőbe is visszatölthető.
+
+5. A kamera használatához HTTPS szükséges. Ezért nem elég az index.html fájlt
+   egyszerűen a telefon Letöltések mappájából megnyitni.

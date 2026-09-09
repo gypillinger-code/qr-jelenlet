@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QR Jelenlét – féléves nyilvántartó</title>
+<style>
+:root{
+ --bg:#f4f6f8;--card:#fff;--text:#17212b;--muted:#667085;--line:#d0d5dd;
+ --accent:#155eef;--ok:#137333;--warn:#b54708;--bad:#b42318;--nav:#111827
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{background:var(--nav);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:20}
+.headerrow{max-width:1200px;margin:auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;flex:1}
+header select{padding:9px 10px;border-radius:9px;border:1px solid #485568;background:#fff;min-width:240px}
+main{max-width:1200px;margin:auto;padding:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{background:#e8edf5;color:#26364a}
+.tabs button.active{background:var(--accent);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+h2{font-size:18px;margin:0 0 12px} h3{font-size:15px;margin:12px 0 8px}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:end}
+.field{flex:1;min-width:180px}
+label{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+input,select,button{font:inherit}
+input[type=text],input[type=date],input[type=time],select{
+ width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fff
+}
+button,.btn{border:0;border-radius:9px;padding:9px 12px;cursor:pointer;font-weight:650}
+.primary{background:var(--accent);color:#fff}.secondary{background:#e9eefb;color:#183153}
+.gray{background:#eef1f4;color:#344054}.success{background:#e8f6ed;color:var(--ok)}
+.danger{background:#feeceb;color:var(--bad)}.warnbtn{background:#fff1e6;color:var(--warn)}
+.small{padding:6px 8px;font-size:12px}
+.note{color:var(--muted);font-size:13px;line-height:1.45}
+.msg{display:none;margin-top:10px;padding:9px;border-radius:8px}
+.msg.ok{display:block;background:#eaf7ee;color:var(--ok)}.msg.warn{display:block;background:#fff4e9;color:var(--warn)}
+.msg.bad{display:block;background:#feeeee;color:var(--bad)}
+.stats{display:flex;gap:8px;flex-wrap:wrap}.stat{border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:110px;background:#f8fafc}
+.stat b{font-size:21px;display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}.tablewrap{overflow:auto;max-width:100%}
+th,td{padding:8px 7px;border-bottom:1px solid #eaecf0;text-align:left;white-space:nowrap}
+th{font-size:12px;color:var(--muted);background:#fff;position:sticky;top:0;z-index:1}
+.present{background:#f1fbf4}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.badge{display:inline-block;border-radius:999px;padding:2px 6px;font-size:11px;font-weight:700}
+.badge.ok{background:#e7f6ec;color:var(--ok)}.badge.no{background:#f2f4f7;color:#667085}
+.badge.manual{background:#eef4ff;color:#175cd3}.badge.qr{background:#eaf7ee;color:#137333}
+.hidden{display:none!important}
+#videoWrap{display:none;position:relative;background:#000;border-radius:12px;overflow:hidden;margin-top:10px}
+#video{width:100%;max-height:52vh;display:block}.scanline{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#4ade80}
+.qrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.qrcard{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}.qrcard canvas{width:150px;height:150px;image-rendering:pixelated}
+.qrname{font-weight:700;margin-top:6px}.qrcode{font-family:ui-monospace,Consolas,monospace;color:#475467}
+.flex1{flex:1}.right{margin-left:auto}
+@media(max-width:640px){main{padding:8px}header select{min-width:180px;flex:1}th:nth-child(2),td:nth-child(2){display:none}.card{padding:10px}}
+@media print{header,.tabs,.no-print{display:none!important}body{background:#fff}main{max-width:none;padding:0}.card{border:0;box-shadow:none}.tablewrap{overflow:visible}th{position:static}}
+</style>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#111827">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+
+</head>
+<body>
+<header>
+ <div class="headerrow">
+   <h1>QR Jelenlét – féléves nyilvántartó</h1>
+   <select id="courseSelect" onchange="switchCourse(this.value)"></select>
+   <button class="secondary small" onclick="showTab('courses')">Kurzusok</button>
+   <button id="installBtn" class="secondary small hidden">📱 Telepítés</button>
+ </div>
+</header>
+
+<main>
+ <div class="tabs no-print">
+   <button data-tab="attendance" onclick="showTab('attendance')">Jelenlét</button>
+   <button data-tab="semester" onclick="showTab('semester')">Féléves összesítő</button>
+   <button data-tab="roster" onclick="showTab('roster')">Névsor / QR</button>
+   <button data-tab="courses" onclick="showTab('courses')">Kurzusok / Mentés</button>
+ </div>
+
+ <div id="globalMsg" class="msg"></div>
+
+ <!-- ATTENDANCE -->
+ <section id="tab-attendance" class="tab">
+  <div class="card">
+   <h2>Óra / alkalom</h2>
+   <div id="noCourseAttendance" class="note">Előbb hozz létre vagy válassz egy kurzust.</div>
+   <div id="attendanceControls" class="hidden">
+    <div class="row">
+     <div class="field"><label>Dátum</label><input id="sessionDate" type="date"></div>
+     <div class="field"><label>Kezdés</label><input id="sessionStart" type="time" value="10:00"></div>
+     <div class="field"><label>Megjegyzés / alkalom neve</label><input id="sessionLabel" type="text" placeholder="pl. 3. előadás"></div>
+     <button class="primary" onclick="createSession()">Új alkalom indítása</button>
+    </div>
+    <div class="row" style="margin-top:9px">
+      <div class="field"><label>Korábbi alkalom megnyitása</label><select id="sessionSelect" onchange="openSession(this.value)"></select></div>
+      <button class="gray" onclick="closeSessionView()">Nincs kiválasztva</button>
+    </div>
+   </div>
+  </div>
+
+  <div id="activeSessionArea" class="hidden">
+   <div class="card" id="scannerCard">
+    <h2 id="activeSessionTitle">Aktív alkalom</h2>
+    <div class="stats">
+      <div class="stat"><span>Hallgató</span><b id="statTotal">0</b></div>
+      <div class="stat"><span>Jelen</span><b id="statPresent">0</b></div>
+      <div class="stat"><span>Hiányzik</span><b id="statAbsent">0</b></div>
+    </div>
+    <div class="row no-print" style="margin-top:10px">
+      <button class="primary" id="startScanBtn" onclick="startScanner()">📷 QR-szkenner</button>
+      <button class="gray" id="stopScanBtn" onclick="stopScanner()" disabled>Leállítás</button>
+      <button class="secondary" onclick="toggleManualSearch()">✍ Kézi jelenlét</button>
+    </div>
+    <div id="videoWrap"><video id="video" playsinline muted></video><div class="scanline"></div></div>
+    <div id="scanMsg" class="msg"></div>
+    <div id="manualSearchBox" class="hidden no-print" style="margin-top:10px">
+      <label>Keresés név vagy Neptun-kód alapján</label>
+      <input id="manualSearch" type="text" placeholder="pl. Kiss vagy ABC123" oninput="renderManualSearch()">
+      <div id="manualResults" style="margin-top:6px"></div>
+    </div>
+   </div>
+
+   <div class="card">
+    <h2>Jelenléti névsor</h2>
+    <div class="tablewrap"><table><thead><tr><th>Név</th><th>Neptun</th><th>Állapot</th><th>Érkezés</th><th>Mód</th><th class="no-print">Művelet</th></tr></thead><tbody id="attendanceBody"></tbody></table></div>
+   </div>
+  </div>
+ </section>
+
+ <!-- SEMESTER -->
+ <section id="tab-semester" class="tab hidden">
+   <div class="card">
+    <div class="row">
+      <h2 class="flex1">Féléves összesítő</h2>
+      <button class="success no-print" onclick="exportSemesterCSV()">⬇ CSV export (Excelhez)</button>
+      <button class="secondary no-print" onclick="window.print()">🖨 Nyomtatás</button>
+    </div>
+    <p class="note">Egy hallgató egy sor. Minden megtartott alkalom külön oszlop; a cellában az érkezési idő és a rögzítés módja szerepel.</p>
+    <div class="tablewrap"><table id="semesterTable"></table></div>
+   </div>
+ </section>
+
+ <!-- ROSTER -->
+ <section id="tab-roster" class="tab hidden">
+   <div class="card">
+    <h2>Névsor kezelése</h2>
+    <div id="noCourseRoster" class="note">Előbb válassz kurzust.</div>
+    <div id="rosterControls" class="hidden">
+      <div class="row no-print">
+       <label class="btn primary" style="display:inline-block">CSV névsor betöltése<input id="rosterFile" type="file" accept=".csv,text/csv" hidden></label>
+       <button class="secondary" onclick="toggleAddStudent()">+ Hallgató kézzel</button>
+       <button class="gray" onclick="renderQRPreview()">QR-kódok megjelenítése</button>
+       <button class="success" onclick="downloadQRZip()">QR-kódok ZIP-ben</button>
+      </div>
+      <div id="addStudentBox" class="hidden no-print" style="margin-top:10px">
+       <div class="row">
+        <div class="field"><label>Név</label><input id="newStudentName" type="text" placeholder="Hallgató neve"></div>
+        <div class="field"><label>Neptun-kód (elhagyható)</label><input id="newStudentCode" type="text" placeholder="pl. ABC123"></div>
+        <button class="primary" onclick="addStudent()">Hozzáadás</button>
+       </div>
+       <p class="note">Ha nincs Neptun-kód, a program automatikus helyi azonosítót készít (MAN001, MAN002…).</p>
+      </div>
+    </div>
+   </div>
+
+   <div class="card">
+    <h2>Hallgatók</h2>
+    <div class="tablewrap"><table><thead><tr><th>Név</th><th>Azonosító</th><th class="no-print">Művelet</th></tr></thead><tbody id="rosterBody"></tbody></table></div>
+   </div>
+
+   <div class="card hidden" id="qrPreviewCard">
+     <h2>QR-kódok</h2>
+     <div id="qrPreview" class="qrgrid"></div>
+   </div>
+ </section>
+
+ <!-- COURSES -->
+ <section id="tab-courses" class="tab hidden">
+   <div class="card">
+    <h2>Új kurzus</h2>
+    <div class="row">
+      <div class="field"><label>Kurzus neve</label><input id="newCourseName" type="text" placeholder="pl. Motor és traktortechnika"></div>
+      <div class="field"><label>Félév (opcionális)</label><input id="newCourseTerm" type="text" placeholder="pl. 2026/27/1"></div>
+      <button class="primary" onclick="createCourse()">Kurzus létrehozása</button>
+    </div>
+   </div>
+
+   <div class="card">
+    <h2>Kurzusok</h2>
+    <div class="tablewrap"><table><thead><tr><th>Kurzus</th><th>Félév</th><th>Hallgatók</th><th>Alkalmak</th><th class="no-print">Művelet</th></tr></thead><tbody id="courseBody"></tbody></table></div>
+   </div>
+
+   <div class="card no-print">
+    <h2>Biztonsági mentés</h2>
+    <p class="note">Az adatok automatikusan mentődnek ezen az eszközön. Telepített alkalmazásként ugyanebből a tárhelyből töltődnek vissza. Félév közben ettől függetlenül érdemes időnként teljes mentést készíteni.</p>
+    <div class="row">
+      <button class="success" onclick="backupAll()">⬇ Teljes mentés (.json)</button>
+      <label class="btn secondary" style="display:inline-block">Mentés visszatöltése<input id="restoreFile" type="file" accept=".json,application/json" hidden></label>
+    </div>
+   </div>
+ </section>
+</main>
+
+<script>
+const STORE_KEY="qr_attendance_semester_v1";
+let db={courses:[],activeCourseId:null};
+let currentSessionId=null;
+let stream=null,detector=null,scanTimer=null,lastScan={value:"",at:0};
+
+function id(prefix){return prefix+"_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7)}
+function today(){return new Date().toISOString().slice(0,10)}
+function nowTime(){return new Date().toLocaleTimeString("hu-HU",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function save(){localStorage.setItem(STORE_KEY,JSON.stringify(db))}
+function load(){
+ try{const x=JSON.parse(localStorage.getItem(STORE_KEY)||"null");if(x&&Array.isArray(x.courses))db=x}catch(e){}
+ document.getElementById("sessionDate").value=today();
+ renderAll();
+}
+function msg(text,type="ok",target="globalMsg"){
+ const e=document.getElementById(target);e.textContent=text;e.className="msg "+type;
+ clearTimeout(e._t);e._t=setTimeout(()=>e.className="msg",3500);
+}
+function activeCourse(){return db.courses.find(c=>c.id===db.activeCourseId)||null}
+function activeSession(){
+ const c=activeCourse();return c?c.sessions.find(s=>s.id===currentSessionId)||null:null
+}
+function showTab(name){
+ document.querySelectorAll(".tab").forEach(x=>x.classList.add("hidden"));
+ document.getElementById("tab-"+name).classList.remove("hidden");
+ document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));
+ if(name==="semester")renderSemester();
+ if(name==="roster")renderRoster();
+ if(name==="courses")renderCourses();
+}
+function renderAll(){
+ renderCourseSelect();renderCourses();renderRoster();renderSessionSelect();renderAttendance();renderSemester();
+ const has=!!activeCourse();
+ document.getElementById("noCourseAttendance").classList.toggle("hidden",has);
+ document.getElementById("attendanceControls").classList.toggle("hidden",!has);
+ document.getElementById("noCourseRoster").classList.toggle("hidden",has);
+ document.getElementById("rosterControls").classList.toggle("hidden",!has);
+}
+function renderCourseSelect(){
+ const sel=document.getElementById("courseSelect");sel.innerHTML="";
+ if(!db.courses.length){sel.innerHTML='<option value="">Nincs kurzus</option>';return}
+ db.courses.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name+(c.term?" – "+c.term:"");o.selected=c.id===db.activeCourseId;sel.appendChild(o)})
+}
+function createCourse(){
+ const name=document.getElementById("newCourseName").value.trim(),term=document.getElementById("newCourseTerm").value.trim();
+ if(!name){msg("Adj nevet a kurzusnak.","warn");return}
+ const c={id:id("c"),name,term,students:[],sessions:[]};db.courses.push(c);db.activeCourseId=c.id;currentSessionId=null;save();
+ document.getElementById("newCourseName").value="";document.getElementById("newCourseTerm").value="";
+ renderAll();showTab("roster");msg("Kurzus létrehozva. Most töltsd be a névsort.","ok");
+}
+function switchCourse(cid){db.activeCourseId=cid||null;currentSessionId=null;stopScanner();save();renderAll()}
+function deleteCourse(cid){
+ const c=db.courses.find(x=>x.id===cid);if(!c)return;
+ if(!confirm(`Biztosan törlöd a(z) "${c.name}" kurzust és az összes jelenléti adatát?`))return;
+ db.courses=db.courses.filter(x=>x.id!==cid);
+ if(db.activeCourseId===cid)db.activeCourseId=db.courses[0]?.id||null;
+ currentSessionId=null;save();renderAll()
+}
+function renderCourses(){
+ const b=document.getElementById("courseBody");b.innerHTML="";
+ db.courses.forEach(c=>{
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><b>${esc(c.name)}</b></td><td>${esc(c.term||"–")}</td><td>${c.students.length}</td><td>${c.sessions.length}</td>
+  <td class="no-print"><button class="small secondary" onclick="switchCourse('${c.id}');showTab('attendance')">Megnyitás</button>
+  <button class="small danger" onclick="deleteCourse('${c.id}')">Törlés</button></td>`;
+  b.appendChild(tr)
+ })
+}
+
+/* ROSTER */
+function parseLine(line,delim){
+ const out=[];let cur="",q=false;
+ for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(q&&line[i+1]==='"'){cur+='"';i++}else q=!q}else if(ch===delim&&!q){out.push(cur);cur=""}else cur+=ch}
+ out.push(cur);return out
+}
+document.getElementById("rosterFile").addEventListener("change",e=>{
+ const c=activeCourse(),file=e.target.files[0];if(!c||!file)return;
+ const r=new FileReader();
+ r.onload=()=>{
+  try{
+   const text=r.result.replace(/^\uFEFF/,"").trim(),lines=text.split(/\r?\n/).filter(Boolean);
+   if(lines.length<2)throw new Error("A CSV üres.");
+   const delim=lines[0].includes(";")?";":",",hdr=parseLine(lines[0],delim).map(x=>x.trim().toLowerCase());
+   const ni=hdr.findIndex(x=>x==="név"||x==="nev"||x==="name"||x.includes("név"));
+   const ci=hdr.findIndex(x=>x==="neptun"||x.includes("neptun")||x==="kód"||x==="kod"||x==="code");
+   if(ni<0||ci<0)throw new Error("A fejléc legyen Név;Neptun.");
+   const incoming=[];
+   for(let i=1;i<lines.length;i++){const a=parseLine(lines[i],delim),name=(a[ni]||"").trim(),code=(a[ci]||"").trim().toUpperCase();if(name&&code)incoming.push({id:id("s"),name,code})}
+   if(!incoming.length)throw new Error("Nincs hallgatói adat.");
+   if(c.students.length&&!confirm(`A kurzusban már ${c.students.length} hallgató van. A CSV hallgatóit hozzáfűzzem a meglévő névsorhoz?`))return;
+   const existing=new Set(c.students.map(s=>s.code.toUpperCase()));
+   incoming.forEach(s=>{if(!existing.has(s.code)){c.students.push(s);existing.add(s.code)}});
+   save();renderAll();msg(`Névsor frissítve: ${c.students.length} hallgató.`,"ok")
+  }catch(err){msg("Hiba: "+err.message,"bad")}
+ };r.readAsText(file,"utf-8");e.target.value=""
+});
+function toggleAddStudent(){document.getElementById("addStudentBox").classList.toggle("hidden")}
+function nextManualCode(c){
+ let n=1;const used=new Set(c.students.map(s=>s.code));
+ while(used.has("MAN"+String(n).padStart(3,"0")))n++;
+ return "MAN"+String(n).padStart(3,"0")
+}
+function addStudent(){
+ const c=activeCourse();if(!c)return;
+ const name=document.getElementById("newStudentName").value.trim();let code=document.getElementById("newStudentCode").value.trim().toUpperCase();
+ if(!name){msg("A név megadása szükséges.","warn");return}
+ if(!code)code=nextManualCode(c);
+ if(c.students.some(s=>s.code.toUpperCase()===code)){msg("Ez az azonosító már szerepel a kurzusban.","warn");return}
+ c.students.push({id:id("s"),name,code});save();document.getElementById("newStudentName").value="";document.getElementById("newStudentCode").value="";
+ renderAll();msg(`${name} hozzáadva (${code}).`,"ok")
+}
+function deleteStudent(sid){
+ const c=activeCourse(),s=c?.students.find(x=>x.id===sid);if(!c||!s)return;
+ if(!confirm(`Törlöd: ${s.name}? A korábbi jelenléti adatai is eltűnnek.`))return;
+ c.students=c.students.filter(x=>x.id!==sid);c.sessions.forEach(ss=>{delete ss.attendance[sid]});save();renderAll()
+}
+function renderRoster(){
+ const b=document.getElementById("rosterBody");b.innerHTML="";const c=activeCourse();if(!c)return;
+ c.students.forEach(s=>{const tr=document.createElement("tr");tr.innerHTML=`<td>${esc(s.name)}</td><td class="mono">${esc(s.code)}</td><td class="no-print"><button class="small danger" onclick="deleteStudent('${s.id}')">Törlés</button></td>`;b.appendChild(tr)})
+}
+
+/* QR generator v1-L byte */
+function gfMul(x,y){let z=0;for(let i=7;i>=0;i--){z=(z<<1)^((z>>>7)*0x11D);if((y>>>i)&1)z^=x}return z&255}
+function rsDivisor(degree){let res=new Uint8Array(degree);res[degree-1]=1;let root=1;for(let i=0;i<degree;i++){for(let j=0;j<degree;j++){res[j]=gfMul(res[j],root);if(j+1<degree)res[j]^=res[j+1]}root=gfMul(root,2)}return res}
+function rsRemainder(data,degree){const div=rsDivisor(degree),res=new Uint8Array(degree);for(const b of data){const factor=b^res[0];res.copyWithin(0,1);res[degree-1]=0;for(let j=0;j<degree;j++)res[j]^=gfMul(div[j],factor)}return Array.from(res)}
+function appendBits(arr,val,len){for(let i=len-1;i>=0;i--)arr.push((val>>>i)&1)}
+function makeCodewords(text){const bytes=[...new TextEncoder().encode(text)];if(bytes.length>17)throw new Error("Az azonosító túl hosszú (max. 17 bájt).");const bits=[];appendBits(bits,4,4);appendBits(bits,bytes.length,8);bytes.forEach(b=>appendBits(bits,b,8));const cap=152;appendBits(bits,0,Math.min(4,cap-bits.length));while(bits.length%8)bits.push(0);const data=[];for(let i=0;i<bits.length;i+=8){let v=0;for(let j=0;j<8;j++)v=(v<<1)|bits[i+j];data.push(v)}let pad=0;while(data.length<19){data.push(pad%2===0?0xEC:0x11);pad++}return data.concat(rsRemainder(data,7))}
+function setFinder(m,f,row,col){for(let dy=-1;dy<=7;dy++)for(let dx=-1;dx<=7;dx++){const y=row+dy,x=col+dx;if(y<0||x<0||y>=21||x>=21)continue;const dist=Math.max(Math.abs(dx-3),Math.abs(dy-3));m[y][x]=(dist!==2&&dist!==4);f[y][x]=true}}
+function formatBits(mask){const data=(1<<3)|mask;let rem=data<<10;for(let i=14;i>=10;i--)if((rem>>>i)&1)rem^=0x537<<(i-10);return ((data<<10)|rem)^0x5412}
+function makeMatrix(text){const size=21,m=Array.from({length:size},()=>Array(size).fill(false)),f=Array.from({length:size},()=>Array(size).fill(false));setFinder(m,f,0,0);setFinder(m,f,0,14);setFinder(m,f,14,0);for(let i=8;i<size-8;i++){if(!f[6][i]){m[6][i]=i%2===0;f[6][i]=true}if(!f[i][6]){m[i][6]=i%2===0;f[i][6]=true}}for(let i=0;i<9;i++)if(i!==6){f[8][i]=true;f[i][8]=true}for(let i=0;i<8;i++){f[8][size-1-i]=true;f[size-1-i][8]=true}f[size-8][8]=true;m[size-8][8]=true;const bits=[];makeCodewords(text).forEach(b=>appendBits(bits,b,8));let k=0,up=true;for(let right=size-1;right>=1;right-=2){if(right===6)right=5;for(let v=0;v<size;v++){const y=up?size-1-v:v;for(let j=0;j<2;j++){const x=right-j;if(f[y][x])continue;let bit=k<bits.length?bits[k++]:0;m[y][x]=!!(bit^(((x+y)%2===0)?1:0))}}up=!up}const fb=formatBits(0),get=i=>((fb>>>i)&1)!==0;for(let i=0;i<=5;i++)m[i][8]=get(i);m[7][8]=get(6);m[8][8]=get(7);m[8][7]=get(8);for(let i=9;i<15;i++)m[8][14-i]=get(i);for(let i=0;i<8;i++)m[8][size-1-i]=get(i);for(let i=8;i<15;i++)m[size-15+i][8]=get(i);m[size-8][8]=true;return m}
+function drawQR(canvas,text,size=500){const mat=makeMatrix(text),q=4,mods=29;canvas.width=size;canvas.height=size;const ctx=canvas.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,size,size);ctx.fillStyle="#000";const cell=size/mods;for(let y=0;y<21;y++)for(let x=0;x<21;x++)if(mat[y][x]){const x0=Math.round((x+q)*cell),y0=Math.round((y+q)*cell),x1=Math.round((x+q+1)*cell),y1=Math.round((y+q+1)*cell);ctx.fillRect(x0,y0,x1-x0,y1-y0)}}
+function renderQRPreview(){
+ const c=activeCourse();if(!c||!c.students.length){msg("Nincs hallgató a kurzusban.","warn");return}
+ const box=document.getElementById("qrPreview");box.innerHTML="";document.getElementById("qrPreviewCard").classList.remove("hidden");
+ try{c.students.forEach(s=>{const d=document.createElement("div");d.className="qrcard";const cv=document.createElement("canvas");drawQR(cv,s.code);const n=document.createElement("div");n.className="qrname";n.textContent=s.name;const k=document.createElement("div");k.className="qrcode";k.textContent=s.code;d.append(cv,n,k);box.appendChild(d)})}catch(e){msg("QR hiba: "+e.message,"bad")}
+}
+const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u8){let c=0xFFFFFFFF;for(const b of u8)c=crcTable[(c^b)&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+function u16(n){return[n&255,(n>>>8)&255]}function u32(n){return[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]}
+function canvasBytes(cv){const d=atob(cv.toDataURL("image/png").split(",")[1]),u=new Uint8Array(d.length);for(let i=0;i<d.length;i++)u[i]=d.charCodeAt(i);return u}
+function safe(s){return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"_")}
+async function downloadQRZip(){
+ const c=activeCourse();if(!c||!c.students.length){msg("Nincs hallgató.","warn");return}
+ const enc=new TextEncoder(),locals=[],centrals=[];let offset=0;
+ for(const s of c.students){const cv=document.createElement("canvas");drawQR(cv,s.code);const data=canvasBytes(cv),name=enc.encode(`${s.code}_${safe(s.name)}.png`),crc=crc32(data);const loc=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0),...u16(0),...u16(0),...u16(0),...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),...u16(0),...name]);locals.push(loc,data);const cen=new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0),...u16(0),...u16(0),...u16(0),...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(offset),...name]);centrals.push(cen);offset+=loc.length+data.length}
+ const cs=centrals.reduce((a,b)=>a+b.length,0),end=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(c.students.length),...u16(c.students.length),...u32(cs),...u32(offset),...u16(0)]);
+ const blob=new Blob([...locals,...centrals,end],{type:"application/zip"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`QR_${safe(c.name)}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
+}
+
+/* SESSIONS / ATTENDANCE */
+function createSession(){
+ const c=activeCourse();if(!c)return;
+ const date=document.getElementById("sessionDate").value||today(),start=document.getElementById("sessionStart").value||"",label=document.getElementById("sessionLabel").value.trim();
+ const s={id:id("ses"),date,start,label,createdAt:new Date().toISOString(),attendance:{}};c.sessions.push(s);currentSessionId=s.id;save();renderAll();msg("Új alkalom létrehozva.","ok")
+}
+function renderSessionSelect(){
+ const sel=document.getElementById("sessionSelect");sel.innerHTML='<option value="">– válassz –</option>';const c=activeCourse();if(!c)return;
+ [...c.sessions].sort((a,b)=>(b.date+b.start).localeCompare(a.date+a.start)).forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=`${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;o.selected=s.id===currentSessionId;sel.appendChild(o)})
+}
+function openSession(sid){currentSessionId=sid||null;stopScanner();renderAttendance()}
+function closeSessionView(){currentSessionId=null;stopScanner();document.getElementById("sessionSelect").value="";renderAttendance()}
+function markAttendanceByCode(raw,method="QR"){
+ const c=activeCourse(),s=activeSession();if(!c||!s)return;
+ const code=String(raw||"").trim().toUpperCase(),st=c.students.find(x=>x.code.toUpperCase()===code);
+ if(!st){msg("Ismeretlen QR-kód: "+code,"bad","scanMsg");return}
+ if(s.attendance[st.id]){msg(`${st.name} már rögzítve: ${s.attendance[st.id].time}`,"warn","scanMsg");return}
+ s.attendance[st.id]={time:nowTime(),method};save();renderAttendance();msg(`✓ ${st.name} – ${s.attendance[st.id].time}`,"ok","scanMsg");if(navigator.vibrate)navigator.vibrate(80)
+}
+function manualAttend(sid){
+ const s=activeSession(),c=activeCourse(),st=c?.students.find(x=>x.id===sid);if(!s||!st)return;
+ if(s.attendance[sid]){msg("Már jelenlévő.","warn","scanMsg");return}
+ s.attendance[sid]={time:nowTime(),method:"kézi"};save();renderAttendance();renderManualSearch()
+}
+function removeAttendance(sid){const s=activeSession();if(!s)return;delete s.attendance[sid];save();renderAttendance();renderManualSearch()}
+function renderAttendance(){
+ const area=document.getElementById("activeSessionArea"),b=document.getElementById("attendanceBody");b.innerHTML="";const c=activeCourse(),s=activeSession();
+ area.classList.toggle("hidden",!c||!s);if(!c||!s)return;
+ document.getElementById("activeSessionTitle").textContent=`${c.name} – ${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;
+ let p=0;c.students.forEach(st=>{const a=s.attendance[st.id];if(a)p++;const tr=document.createElement("tr");tr.className=a?"present":"";tr.innerHTML=`<td>${esc(st.name)}</td><td class="mono">${esc(st.code)}</td><td>${a?'<span class="badge ok">✓ Jelen</span>':'<span class="badge no">– Hiányzik</span>'}</td><td>${a?esc(a.time):"–"}</td><td>${a?(a.method==="kézi"?'<span class="badge manual">kézi</span>':'<span class="badge qr">QR</span>'):"–"}</td><td class="no-print">${a?`<button class="small danger" onclick="removeAttendance('${st.id}')">Törlés</button>`:`<button class="small secondary" onclick="manualAttend('${st.id}')">Kézi ✓</button>`}</td>`;b.appendChild(tr)});
+ document.getElementById("statTotal").textContent=c.students.length;document.getElementById("statPresent").textContent=p;document.getElementById("statAbsent").textContent=c.students.length-p
+}
+function toggleManualSearch(){document.getElementById("manualSearchBox").classList.toggle("hidden");renderManualSearch()}
+function renderManualSearch(){
+ const box=document.getElementById("manualResults"),c=activeCourse(),s=activeSession();if(!c||!s)return;box.innerHTML="";
+ const q=document.getElementById("manualSearch").value.trim().toLowerCase();
+ c.students.filter(st=>!q||st.name.toLowerCase().includes(q)||st.code.toLowerCase().includes(q)).slice(0,12).forEach(st=>{const a=s.attendance[st.id],d=document.createElement("div");d.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #eee";d.innerHTML=`<span><b>${esc(st.name)}</b> <span class="mono">${esc(st.code)}</span>${a?" ✓":""}</span>${a?`<button class="small danger" onclick="removeAttendance('${st.id}')">Visszavonás</button>`:`<button class="small secondary" onclick="manualAttend('${st.id}')">Jelen</button>`}`;box.appendChild(d)})
+}
+async function startScanner(){
+ if(!activeSession()){msg("Előbb nyiss meg egy alkalmat.","warn");return}
+ if(!("BarcodeDetector" in window)){msg("A böngésző nem támogatja a beépített QR-olvasót. Android Chrome/Edge ajánlott. A kézi jelenlét ettől működik.","bad","scanMsg");return}
+ try{detector=new BarcodeDetector({formats:["qr_code"]});stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});const v=document.getElementById("video");v.srcObject=stream;await v.play();document.getElementById("videoWrap").style.display="block";document.getElementById("startScanBtn").disabled=true;document.getElementById("stopScanBtn").disabled=false;scanLoop()}catch(e){msg("Kamera nem indítható. Telefonon HTTPS vagy localhost szükséges lehet. "+e.message,"bad","scanMsg")}
+}
+async function scanLoop(){if(!stream||!detector)return;try{const codes=await detector.detect(document.getElementById("video"));if(codes.length){const val=(codes[0].rawValue||"").trim(),n=Date.now();if(val&&(val!==lastScan.value||n-lastScan.at>2500)){lastScan={value:val,at:n};markAttendanceByCode(val,"QR")}}}catch(e){}scanTimer=setTimeout(scanLoop,220)}
+function stopScanner(){if(scanTimer)clearTimeout(scanTimer);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;detector=null;document.getElementById("videoWrap").style.display="none";document.getElementById("startScanBtn").disabled=false;document.getElementById("stopScanBtn").disabled=true}
+
+/* SEMESTER */
+function sessionHeader(s){return `${s.date}${s.label?" "+s.label:""}`}
+function renderSemester(){
+ const t=document.getElementById("semesterTable"),c=activeCourse();t.innerHTML="";if(!c){t.innerHTML="<tr><td>Nincs kiválasztott kurzus.</td></tr>";return}
+ const sessions=[...c.sessions].sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+ const thead=document.createElement("thead"),hr=document.createElement("tr");hr.innerHTML="<th>Név</th><th>Neptun</th>"+sessions.map(s=>`<th title="${esc(s.start||"")}">${esc(sessionHeader(s))}</th>`).join("")+"<th>Jelenlét</th>";thead.appendChild(hr);t.appendChild(thead);
+ const tb=document.createElement("tbody");
+ c.students.forEach(st=>{let count=0;const cells=sessions.map(s=>{const a=s.attendance[st.id];if(a)count++;return `<td>${a?`✓ ${esc(a.time)}${a.method==="kézi"?" (K)":""}`:"–"}</td>`}).join("");const tr=document.createElement("tr");tr.innerHTML=`<td>${esc(st.name)}</td><td class="mono">${esc(st.code)}</td>${cells}<td>${count}/${sessions.length}</td>`;tb.appendChild(tr)});
+ t.appendChild(tb)
+}
+function csvQuote(v){return `"${String(v??"").replace(/"/g,'""')}"`}
+function exportSemesterCSV(){
+ const c=activeCourse();if(!c){msg("Nincs kurzus.","warn");return}
+ const sessions=[...c.sessions].sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+ const rows=[["Név","Neptun",...sessions.map(s=>sessionHeader(s)),"Jelenlétek száma"]];
+ c.students.forEach(st=>{let count=0;const vals=sessions.map(s=>{const a=s.attendance[st.id];if(!a)return "";count++;return `${a.time} [${a.method}]`});rows.push([st.name,st.code,...vals,`${count}/${sessions.length}`])});
+ const text="\uFEFF"+rows.map(r=>r.map(csvQuote).join(";")).join("\r\n"),blob=new Blob([text],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`jelenlet_${safe(c.name)}_${safe(c.term||"felev")}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
+}
+
+/* BACKUP */
+function backupAll(){
+ const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`qr_jelenlet_teljes_mentes_${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
+}
+document.getElementById("restoreFile").addEventListener("change",e=>{
+ const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x||!Array.isArray(x.courses))throw new Error("Érvénytelen mentés.");if(!confirm("A visszatöltés lecseréli a böngészőben lévő jelenlegi adatokat. Folytatod?"))return;db=x;currentSessionId=null;save();renderAll();msg("Mentés visszatöltve.","ok")}catch(err){msg("Hiba: "+err.message,"bad")}};r.readAsText(file);e.target.value=""
+});
+
+window.addEventListener("beforeunload",stopScanner);
+load();
+showTab("attendance");
+</script>
+
+<script>
+let deferredInstallPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const b = document.getElementById("installBtn");
+  if (b) b.classList.remove("hidden");
+});
+document.getElementById("installBtn")?.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById("installBtn")?.classList.add("hidden");
+});
+window.addEventListener("appinstalled", () => {
+  const b = document.getElementById("installBtn");
+  if (b) b.classList.add("hidden");
+});
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+  });
+}
+</script>
+
+</body>
+</html>
