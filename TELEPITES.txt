@@ -1,23 +1,28 @@
-QR JELENLÉT – TELEPÍTHETŐ WEBAPP (PWA)
+QR JELENLÉT v2.0 – FRISSÍTÉS
 
-1. A csomag fájljait egy HTTPS-es webhelyre kell feltölteni ugyanabba a mappába:
+FONTOS: frissítés előtt készíts „Teljes mentés (.json)” fájlt a jelenlegi appból.
+
+GitHub Pages frissítés:
+1. A repository gyökerében cseréld le / töltsd fel ezeket a fájlokat:
    - index.html
    - manifest.webmanifest
    - service-worker.js
-   - icon.svg
+   - icon-192.png
+   - icon-512.png
+2. A régi icon.svg maradhat vagy törölhető; a v2 már nem használja.
+3. Várd meg, amíg a GitHub Pages újra deployol.
+4. Telefonon zárd be teljesen a QR Jelenlét appot, majd nyisd meg újra.
+   Ha még a régi verzió látszik, frissítsd az oldalt / nyisd meg még egyszer.
+5. Az adatbázis kulcsa változatlan, ezért a meglévő kurzusok és jelenlétek megmaradnak.
+   A korábbi JSON mentések is visszatölthetők.
 
-2. Android / Chrome:
-   - Nyisd meg a webcímet.
-   - A böngésző menüjében válaszd: „Telepítés” / „Alkalmazás telepítése”
-     vagy az alkalmazáson belüli „Telepítés” gombot.
-   - Ezután külön ikon jelenik meg a kezdőképernyőn.
-
-3. Az adatok minden változtatás után automatikusan mentődnek az eszközön.
-   A kurzusok, névsorok és alkalmak az app újranyitásakor visszatöltődnek.
-
-4. Biztonság:
-   A „Kurzusok / Mentés” oldalon időnként készíts „Teljes mentés (.json)” fájlt.
-   Ez másik telefonra vagy böngészőbe is visszatölthető.
-
-5. A kamera használatához HTTPS szükséges. Ezért nem elég az index.html fájlt
-   egyszerűen a telefon Letöltések mappájából megnyitni.
+V2.0 fő újdonságok:
+- Kurzus létrehozásakor automatikus alkalom-létrehozás.
+- + Alkalom gomb.
+- Alkalom szerkesztése: név, dátum, kezdési idő.
+- Alkalom törlése megerősítéssel; meglévő jelenlétnél külön figyelmeztetés.
+- Magyar / English felület és megjegyzett nyelvválasztás.
+- QR-szkenner automatikus újraindítása, ha az app háttérből visszatér.
+- Visszafelé kompatibilis adatkezelés és JSON mentés.
+- Új v2 app ikon.
+- Offline működés, bejelentkezés nélkül továbbra is megmarad.
