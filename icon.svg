@@ -13,4 +13,6 @@
 <rect x="352" y="352" width="40" height="40" fill="white"/>
 <rect x="408" y="368" width="32" height="72" fill="white"/>
 <rect x="280" y="408" width="72" height="32" fill="white"/>
+<rect x="255" y="398" width="220" height="84" rx="24" fill="#16a34a" stroke="#111827" stroke-width="8"/>
+<text x="365" y="459" text-anchor="middle" font-family="Arial,sans-serif" font-size="66" font-weight="bold" fill="white">v3</text>
 </svg>

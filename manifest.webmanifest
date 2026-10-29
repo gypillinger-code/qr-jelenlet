@@ -1,23 +1,29 @@
 {
-  "name": "QR Jelenlét",
-  "short_name": "QR Jelenlét",
+  "name": "QR Jelenlét v3",
+  "short_name": "QR Jelenlét v3",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f4f6f8",
   "theme_color": "#111827",
-  "description": "Egyszerű, offline QR-kódos jelenléti nyilvántartó.",
+  "description": "Kurzusonkénti QR-kódos féléves jelenléti nyilvántartó.",
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]
