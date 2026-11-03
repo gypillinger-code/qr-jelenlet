@@ -14,7 +14,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-appl
 header{background:var(--nav);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:20}
 .headerrow{max-width:1200px;margin:auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 header h1{font-size:20px;margin:0;flex:1}
-header select{padding:9px 10px;border-radius:9px;border:1px solid #485568;background:#fff;min-width:240px}
+header select{padding:9px 10px;border-radius:9px;border:1px solid #485568;background:#fff;min-width:220px}
+.langselect{min-width:108px!important;width:auto!important}.version{font-size:11px;background:#155eef;border-radius:999px;padding:3px 7px;font-weight:750}
 main{max-width:1200px;margin:auto;padding:12px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .tabs button{background:#e8edf5;color:#26364a}
@@ -59,14 +60,16 @@ th{font-size:12px;color:var(--muted);background:#fff;position:sticky;top:0;z-ind
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#111827">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
 
 </head>
 <body>
 <header>
  <div class="headerrow">
-   <h1>QR Jelenlét – féléves nyilvántartó</h1>
+   <h1>QR Jelenlét – féléves nyilvántartó <span class="version">v2.0</span></h1>
    <select id="courseSelect" onchange="switchCourse(this.value)"></select>
+   <select id="languageSelect" class="langselect" onchange="setLanguage(this.value)" aria-label="Nyelv / Language"><option value="hu">🇭🇺 Magyar</option><option value="en">🇬🇧 English</option></select>
    <button class="secondary small" onclick="showTab('courses')">Kurzusok</button>
    <button id="installBtn" class="secondary small hidden">📱 Telepítés</button>
  </div>
@@ -89,14 +92,21 @@ th{font-size:12px;color:var(--muted);background:#fff;position:sticky;top:0;z-ind
    <div id="noCourseAttendance" class="note">Előbb hozz létre vagy válassz egy kurzust.</div>
    <div id="attendanceControls" class="hidden">
     <div class="row">
-     <div class="field"><label>Dátum</label><input id="sessionDate" type="date"></div>
-     <div class="field"><label>Kezdés</label><input id="sessionStart" type="time" value="10:00"></div>
-     <div class="field"><label>Megjegyzés / alkalom neve</label><input id="sessionLabel" type="text" placeholder="pl. 3. előadás"></div>
-     <button class="primary" onclick="createSession()">Új alkalom indítása</button>
-    </div>
-    <div class="row" style="margin-top:9px">
-      <div class="field"><label>Korábbi alkalom megnyitása</label><select id="sessionSelect" onchange="openSession(this.value)"></select></div>
+      <div class="field"><label>Alkalom kiválasztása</label><select id="sessionSelect" onchange="openSession(this.value)"></select></div>
+      <button class="primary" onclick="createSession()">+ Alkalom</button>
+      <button class="secondary" id="editSessionBtn" onclick="beginEditSession()" disabled>Szerkesztés</button>
+      <button class="danger" id="deleteSessionBtn" onclick="deleteSession()" disabled>Törlés</button>
       <button class="gray" onclick="closeSessionView()">Nincs kiválasztva</button>
+    </div>
+    <div id="sessionEditBox" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+      <div class="row">
+       <div class="field"><label>Dátum</label><input id="sessionDate" type="date"></div>
+       <div class="field"><label>Kezdés</label><input id="sessionStart" type="time"></div>
+       <div class="field"><label>Alkalom neve</label><input id="sessionLabel" type="text" placeholder="pl. 5. előadás"></div>
+       <button class="primary" onclick="saveSessionEdit()">Mentés</button>
+       <button class="gray" onclick="cancelSessionEdit()">Mégse</button>
+      </div>
+      <p class="note">A dátum és a kezdési idő üresen is hagyható.</p>
     </div>
    </div>
   </div>
@@ -184,6 +194,7 @@ th{font-size:12px;color:var(--muted);background:#fff;position:sticky;top:0;z-ind
     <div class="row">
       <div class="field"><label>Kurzus neve</label><input id="newCourseName" type="text" placeholder="pl. Motor és traktortechnika"></div>
       <div class="field"><label>Félév (opcionális)</label><input id="newCourseTerm" type="text" placeholder="pl. 2026/27/1"></div>
+      <div class="field" style="max-width:180px"><label>Alkalmak száma</label><input id="newCourseSessionCount" type="number" min="0" max="60" value="13"></div>
       <button class="primary" onclick="createCourse()">Kurzus létrehozása</button>
     </div>
    </div>
@@ -206,9 +217,76 @@ th{font-size:12px;color:var(--muted);background:#fff;position:sticky;top:0;z-ind
 
 <script>
 const STORE_KEY="qr_attendance_semester_v1";
+const LANG_KEY="qr_attendance_language_v1";
 let db={courses:[],activeCourseId:null};
 let currentSessionId=null;
 let stream=null,detector=null,scanTimer=null,lastScan={value:"",at:0};
+let scannerRequested=false,scannerRestarting=false;
+let currentLang=localStorage.getItem(LANG_KEY)||"hu";
+
+const EN={
+"QR Jelenlét – féléves nyilvántartó":"QR Attendance – semester register",
+"Kurzusok":"Courses","Telepítés":"Install","Jelenlét":"Attendance","Féléves összesítő":"Semester summary",
+"Névsor / QR":"Roster / QR","Kurzusok / Mentés":"Courses / Backup","Óra / alkalom":"Class / session",
+"Előbb hozz létre vagy válassz egy kurzust.":"Create or select a course first.",
+"Alkalom kiválasztása":"Select session","+ Alkalom":"+ Session","Szerkesztés":"Edit","Törlés":"Delete",
+"Nincs kiválasztva":"None selected","Dátum":"Date","Kezdés":"Start","Alkalom neve":"Session name",
+"Mentés":"Save","Mégse":"Cancel","A dátum és a kezdési idő üresen is hagyható.":"Date and start time may be left blank.",
+"Aktív alkalom":"Active session","Hallgató":"Students","Jelen":"Present","Hiányzik":"Absent","QR-szkenner":"QR scanner",
+"Leállítás":"Stop","Kézi jelenlét":"Manual attendance","Keresés név vagy Neptun-kód alapján":"Search by name or student code",
+"Jelenléti névsor":"Attendance roster","Név":"Name","Neptun":"Student ID","Állapot":"Status","Érkezés":"Arrival","Mód":"Method",
+"Művelet":"Action","CSV export (Excelhez)":"CSV export (for Excel)","Nyomtatás":"Print",
+"Egy hallgató egy sor. Minden megtartott alkalom külön oszlop; a cellában az érkezési idő és a rögzítés módja szerepel.":"One student per row. Each session is a separate column; cells show arrival time and recording method.",
+"Névsor kezelése":"Manage roster","Előbb válassz kurzust.":"Select a course first.","CSV névsor betöltése":"Import CSV roster",
+"+ Hallgató kézzel":"+ Add student manually","QR-kódok megjelenítése":"Show QR codes","QR-kódok ZIP-ben":"Download QR ZIP",
+"Neptun-kód (elhagyható)":"Student ID (optional)","Hozzáadás":"Add",
+"Ha nincs Neptun-kód, a program automatikus helyi azonosítót készít (MAN001, MAN002…).":"If no student ID is given, the app creates a local ID automatically (MAN001, MAN002…).",
+"Hallgatók":"Students","Azonosító":"Identifier","QR-kódok":"QR codes","Új kurzus":"New course","Kurzus neve":"Course name",
+"Félév (opcionális)":"Term (optional)","Alkalmak száma":"Number of sessions","Kurzus létrehozása":"Create course",
+"Kurzus":"Course","Félév":"Term","Alkalmak":"Sessions","Megnyitás":"Open","Biztonsági mentés":"Backup",
+"Az adatok automatikusan mentődnek ezen az eszközön. Telepített alkalmazásként ugyanebből a tárhelyből töltődnek vissza. Félév közben ettől függetlenül érdemes időnként teljes mentést készíteni.":"Data is saved automatically on this device. The installed app uses the same local storage. It is still recommended to create a full backup periodically.",
+"Teljes mentés (.json)":"Full backup (.json)","Mentés visszatöltése":"Restore backup","Nincs kurzus":"No course",
+"– válassz –":"– select –","✓ Jelen":"✓ Present","– Hiányzik":"– Absent","kézi":"manual","Kézi ✓":"Manual ✓",
+"Visszavonás":"Undo","Jelenlétek száma":"Attendance count","Nincs kiválasztott kurzus.":"No course selected."
+};
+
+function translatePhrase(s){
+ if(currentLang!=="en") return s;
+ if(EN[s]) return EN[s];
+ let m;
+ if((m=s.match(/^Névsor frissítve: (\d+) hallgató\.$/))) return `Roster updated: ${m[1]} students.`;
+ if((m=s.match(/^Ismeretlen QR-kód: (.+)$/))) return `Unknown QR code: ${m[1]}`;
+ if((m=s.match(/^(.+) már rögzítve: (.+)$/))) return `${m[1]} already recorded: ${m[2]}`;
+ if((m=s.match(/^✓ (.+) – (.+)$/))) return `✓ ${m[1]} – ${m[2]}`;
+ if((m=s.match(/^(.+) hozzáadva \((.+)\)\.$/))) return `${m[1]} added (${m[2]}).`;
+ if((m=s.match(/^Ehhez az alkalomhoz (\d+) jelenléti bejegyzés tartozik\./))) return `This session contains ${m[1]} attendance records. Delete it?`;
+ if(s.startsWith("Hiba: ")) return "Error: "+s.slice(6);
+ return s;
+}
+function setLanguage(lang){
+ currentLang=lang==="en"?"en":"hu";localStorage.setItem(LANG_KEY,currentLang);applyLanguage();
+}
+function applyLanguage(){
+ document.documentElement.lang=currentLang;
+ const sel=document.getElementById("languageSelect");if(sel)sel.value=currentLang;
+ document.title=currentLang==="en"?"QR Attendance – semester register":"QR Jelenlét – féléves nyilvántartó";
+ const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+ let n;
+ while(n=walker.nextNode()){
+   const p=n.parentElement;if(!p||["SCRIPT","STYLE","OPTION"].includes(p.tagName))continue;
+   const raw=n.nodeValue,trim=raw.trim();if(!trim)continue;
+   if(n._huText===undefined)n._huText=trim;
+   const base=n._huText,out=currentLang==="en"?(EN[base]||base):base;
+   n.nodeValue=raw.replace(trim,out);
+ }
+ document.querySelectorAll("input[placeholder]").forEach(el=>{
+   if(el.dataset.huPlaceholder===undefined)el.dataset.huPlaceholder=el.getAttribute("placeholder")||"";
+   const base=el.dataset.huPlaceholder;
+   const phMap={"pl. 3. előadás":"e.g. Lecture 3","pl. 5. előadás":"e.g. Lecture 5","pl. Kiss vagy ABC123":"e.g. Smith or ABC123","Hallgató neve":"Student name","pl. ABC123":"e.g. ABC123","pl. Motor és traktortechnika":"e.g. Motor and tractor technology","pl. 2026/27/1":"e.g. 2026/27/1"};
+   el.setAttribute("placeholder",currentLang==="en"?(phMap[base]||base):base);
+ });
+}
+
 
 function id(prefix){return prefix+"_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7)}
 function today(){return new Date().toISOString().slice(0,10)}
@@ -217,11 +295,19 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&l
 function save(){localStorage.setItem(STORE_KEY,JSON.stringify(db))}
 function load(){
  try{const x=JSON.parse(localStorage.getItem(STORE_KEY)||"null");if(x&&Array.isArray(x.courses))db=x}catch(e){}
- document.getElementById("sessionDate").value=today();
+ migrateDB();
  renderAll();
 }
+function migrateDB(){
+ db.courses.forEach(c=>{
+  if(!Array.isArray(c.students))c.students=[];
+  if(!Array.isArray(c.sessions))c.sessions=[];
+  c.sessions.forEach(s=>{if(!s.attendance||typeof s.attendance!=="object")s.attendance={};if(s.date==null)s.date="";if(s.start==null)s.start="";if(s.label==null)s.label=""});
+ });
+ if(db.activeCourseId&&!db.courses.some(c=>c.id===db.activeCourseId))db.activeCourseId=db.courses[0]?.id||null;
+}
 function msg(text,type="ok",target="globalMsg"){
- const e=document.getElementById(target);e.textContent=text;e.className="msg "+type;
+ const e=document.getElementById(target);e.textContent=translatePhrase(text);e.className="msg "+type;
  clearTimeout(e._t);e._t=setTimeout(()=>e.className="msg",3500);
 }
 function activeCourse(){return db.courses.find(c=>c.id===db.activeCourseId)||null}
@@ -243,18 +329,22 @@ function renderAll(){
  document.getElementById("attendanceControls").classList.toggle("hidden",!has);
  document.getElementById("noCourseRoster").classList.toggle("hidden",has);
  document.getElementById("rosterControls").classList.toggle("hidden",!has);
+ applyLanguage();
 }
 function renderCourseSelect(){
  const sel=document.getElementById("courseSelect");sel.innerHTML="";
- if(!db.courses.length){sel.innerHTML='<option value="">Nincs kurzus</option>';return}
+ if(!db.courses.length){sel.innerHTML=`<option value="">${currentLang==="en"?"No course":"Nincs kurzus"}</option>`;return}
  db.courses.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name+(c.term?" – "+c.term:"");o.selected=c.id===db.activeCourseId;sel.appendChild(o)})
 }
 function createCourse(){
  const name=document.getElementById("newCourseName").value.trim(),term=document.getElementById("newCourseTerm").value.trim();
- if(!name){msg("Adj nevet a kurzusnak.","warn");return}
- const c={id:id("c"),name,term,students:[],sessions:[]};db.courses.push(c);db.activeCourseId=c.id;currentSessionId=null;save();
- document.getElementById("newCourseName").value="";document.getElementById("newCourseTerm").value="";
- renderAll();showTab("roster");msg("Kurzus létrehozva. Most töltsd be a névsort.","ok");
+ const count=Math.max(0,Math.min(60,parseInt(document.getElementById("newCourseSessionCount").value||"0",10)||0));
+ if(!name){msg(currentLang==="en"?"Enter a course name.":"Adj nevet a kurzusnak.","warn");return}
+ const c={id:id("c"),name,term,students:[],sessions:[]};
+ for(let i=1;i<=count;i++)c.sessions.push({id:id("ses"),date:"",start:"",label:(currentLang==="en"?`${i}. session`:`${i}. alkalom`),createdAt:new Date(Date.now()+i).toISOString(),attendance:{}});
+ db.courses.push(c);db.activeCourseId=c.id;currentSessionId=null;save();
+ document.getElementById("newCourseName").value="";document.getElementById("newCourseTerm").value="";document.getElementById("newCourseSessionCount").value="13";
+ renderAll();showTab("roster");msg(currentLang==="en"?"Course created. Now import the roster.":"Kurzus létrehozva. Most töltsd be a névsort.","ok");
 }
 function switchCourse(cid){db.activeCourseId=cid||null;currentSessionId=null;stopScanner();save();renderAll()}
 function deleteCourse(cid){
@@ -272,7 +362,7 @@ function renderCourses(){
   <td class="no-print"><button class="small secondary" onclick="switchCourse('${c.id}');showTab('attendance')">Megnyitás</button>
   <button class="small danger" onclick="deleteCourse('${c.id}')">Törlés</button></td>`;
   b.appendChild(tr)
- })
+ });applyLanguage()
 }
 
 /* ROSTER */
@@ -324,7 +414,7 @@ function deleteStudent(sid){
 }
 function renderRoster(){
  const b=document.getElementById("rosterBody");b.innerHTML="";const c=activeCourse();if(!c)return;
- c.students.forEach(s=>{const tr=document.createElement("tr");tr.innerHTML=`<td>${esc(s.name)}</td><td class="mono">${esc(s.code)}</td><td class="no-print"><button class="small danger" onclick="deleteStudent('${s.id}')">Törlés</button></td>`;b.appendChild(tr)})
+ c.students.forEach(s=>{const tr=document.createElement("tr");tr.innerHTML=`<td>${esc(s.name)}</td><td class="mono">${esc(s.code)}</td><td class="no-print"><button class="small danger" onclick="deleteStudent('${s.id}')">${currentLang==="en"?"Delete":"Törlés"}</button></td>`;b.appendChild(tr)});applyLanguage()
 }
 
 /* QR generator v1-L byte */
@@ -358,15 +448,49 @@ async function downloadQRZip(){
 /* SESSIONS / ATTENDANCE */
 function createSession(){
  const c=activeCourse();if(!c)return;
- const date=document.getElementById("sessionDate").value||today(),start=document.getElementById("sessionStart").value||"",label=document.getElementById("sessionLabel").value.trim();
- const s={id:id("ses"),date,start,label,createdAt:new Date().toISOString(),attendance:{}};c.sessions.push(s);currentSessionId=s.id;save();renderAll();msg("Új alkalom létrehozva.","ok")
+ const n=c.sessions.length+1;
+ const s={id:id("ses"),date:"",start:"",label:(currentLang==="en"?`${n}. session`:`${n}. alkalom`),createdAt:new Date().toISOString(),attendance:{}};
+ c.sessions.push(s);currentSessionId=s.id;save();renderAll();beginEditSession();
+ msg(currentLang==="en"?"New session added.":"Új alkalom hozzáadva.","ok");
+}
+function sessionDisplay(s){
+ const details=[s.date||"",s.start||""].filter(Boolean).join(" ");
+ if(details&&s.label)return `${details} – ${s.label}`;
+ return s.label||details||(currentLang==="en"?"Unnamed session":"Névtelen alkalom");
 }
 function renderSessionSelect(){
- const sel=document.getElementById("sessionSelect");sel.innerHTML='<option value="">– válassz –</option>';const c=activeCourse();if(!c)return;
- [...c.sessions].sort((a,b)=>(b.date+b.start).localeCompare(a.date+a.start)).forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=`${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;o.selected=s.id===currentSessionId;sel.appendChild(o)})
+ const sel=document.getElementById("sessionSelect");sel.innerHTML=`<option value="">${currentLang==="en"?"– select –":"– válassz –"}</option>`;const c=activeCourse();if(!c)return;
+ c.sessions.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=sessionDisplay(s);o.selected=s.id===currentSessionId;sel.appendChild(o)});
+ const has=!!activeSession();document.getElementById("editSessionBtn").disabled=!has;document.getElementById("deleteSessionBtn").disabled=!has;
 }
-function openSession(sid){currentSessionId=sid||null;stopScanner();renderAttendance()}
-function closeSessionView(){currentSessionId=null;stopScanner();document.getElementById("sessionSelect").value="";renderAttendance()}
+function openSession(sid){currentSessionId=sid||null;stopScanner();cancelSessionEdit();renderAttendance();renderSessionSelect();applyLanguage()}
+function closeSessionView(){currentSessionId=null;stopScanner();cancelSessionEdit();document.getElementById("sessionSelect").value="";renderAttendance();renderSessionSelect();applyLanguage()}
+function beginEditSession(){
+ const s=activeSession();if(!s){msg(currentLang==="en"?"Select a session first.":"Előbb válassz egy alkalmat.","warn");return}
+ document.getElementById("sessionDate").value=s.date||"";
+ document.getElementById("sessionStart").value=s.start||"";
+ document.getElementById("sessionLabel").value=s.label||"";
+ document.getElementById("sessionEditBox").classList.remove("hidden");
+}
+function cancelSessionEdit(){document.getElementById("sessionEditBox")?.classList.add("hidden")}
+function saveSessionEdit(){
+ const s=activeSession();if(!s)return;
+ s.date=document.getElementById("sessionDate").value||"";
+ s.start=document.getElementById("sessionStart").value||"";
+ s.label=document.getElementById("sessionLabel").value.trim();
+ save();cancelSessionEdit();renderAll();
+ msg(currentLang==="en"?"Session updated.":"Alkalom módosítva.","ok");
+}
+function deleteSession(){
+ const c=activeCourse(),s=activeSession();if(!c||!s)return;
+ const count=Object.keys(s.attendance||{}).length;
+ let q;
+ if(count)q=currentLang==="en"?`This session contains ${count} attendance records. Are you sure you want to delete it?`:`Ehhez az alkalomhoz ${count} jelenléti bejegyzés tartozik. Biztosan törlöd?`;
+ else q=currentLang==="en"?`Delete "${sessionDisplay(s)}"?`:`Törlöd ezt az alkalmat: "${sessionDisplay(s)}"?`;
+ if(!confirm(q))return;
+ c.sessions=c.sessions.filter(x=>x.id!==s.id);currentSessionId=null;stopScanner();save();renderAll();
+ msg(currentLang==="en"?"Session deleted.":"Alkalom törölve.","ok");
+}
 function markAttendanceByCode(raw,method="QR"){
  const c=activeCourse(),s=activeSession();if(!c||!s)return;
  const code=String(raw||"").trim().toUpperCase(),st=c.students.find(x=>x.code.toUpperCase()===code);
@@ -382,40 +506,80 @@ function manualAttend(sid){
 function removeAttendance(sid){const s=activeSession();if(!s)return;delete s.attendance[sid];save();renderAttendance();renderManualSearch()}
 function renderAttendance(){
  const area=document.getElementById("activeSessionArea"),b=document.getElementById("attendanceBody");b.innerHTML="";const c=activeCourse(),s=activeSession();
- area.classList.toggle("hidden",!c||!s);if(!c||!s)return;
- document.getElementById("activeSessionTitle").textContent=`${c.name} – ${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;
- let p=0;c.students.forEach(st=>{const a=s.attendance[st.id];if(a)p++;const tr=document.createElement("tr");tr.className=a?"present":"";tr.innerHTML=`<td>${esc(st.name)}</td><td class="mono">${esc(st.code)}</td><td>${a?'<span class="badge ok">✓ Jelen</span>':'<span class="badge no">– Hiányzik</span>'}</td><td>${a?esc(a.time):"–"}</td><td>${a?(a.method==="kézi"?'<span class="badge manual">kézi</span>':'<span class="badge qr">QR</span>'):"–"}</td><td class="no-print">${a?`<button class="small danger" onclick="removeAttendance('${st.id}')">Törlés</button>`:`<button class="small secondary" onclick="manualAttend('${st.id}')">Kézi ✓</button>`}</td>`;b.appendChild(tr)});
- document.getElementById("statTotal").textContent=c.students.length;document.getElementById("statPresent").textContent=p;document.getElementById("statAbsent").textContent=c.students.length-p
+ area.classList.toggle("hidden",!c||!s);if(!c||!s){applyLanguage();return;}
+ document.getElementById("activeSessionTitle").textContent=`${c.name} – ${sessionDisplay(s)}`;
+ let p=0;c.students.forEach(st=>{const a=s.attendance[st.id];if(a)p++;const tr=document.createElement("tr");tr.className=a?"present":"";tr.innerHTML=`<td>${esc(st.name)}</td><td class="mono">${esc(st.code)}</td><td>${a?`<span class="badge ok">${currentLang==="en"?"✓ Present":"✓ Jelen"}</span>`:`<span class="badge no">${currentLang==="en"?"– Absent":"– Hiányzik"}</span>`}</td><td>${a?esc(a.time):"–"}</td><td>${a?(a.method==="kézi"?`<span class="badge manual">${currentLang==="en"?"manual":"kézi"}</span>`:'<span class="badge qr">QR</span>'):"–"}</td><td class="no-print">${a?`<button class="small danger" onclick="removeAttendance('${st.id}')">${currentLang==="en"?"Delete":"Törlés"}</button>`:`<button class="small secondary" onclick="manualAttend('${st.id}')">${currentLang==="en"?"Manual ✓":"Kézi ✓"}</button>`}</td>`;b.appendChild(tr)});
+ document.getElementById("statTotal").textContent=c.students.length;document.getElementById("statPresent").textContent=p;document.getElementById("statAbsent").textContent=c.students.length-p;applyLanguage()
 }
 function toggleManualSearch(){document.getElementById("manualSearchBox").classList.toggle("hidden");renderManualSearch()}
 function renderManualSearch(){
  const box=document.getElementById("manualResults"),c=activeCourse(),s=activeSession();if(!c||!s)return;box.innerHTML="";
  const q=document.getElementById("manualSearch").value.trim().toLowerCase();
- c.students.filter(st=>!q||st.name.toLowerCase().includes(q)||st.code.toLowerCase().includes(q)).slice(0,12).forEach(st=>{const a=s.attendance[st.id],d=document.createElement("div");d.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #eee";d.innerHTML=`<span><b>${esc(st.name)}</b> <span class="mono">${esc(st.code)}</span>${a?" ✓":""}</span>${a?`<button class="small danger" onclick="removeAttendance('${st.id}')">Visszavonás</button>`:`<button class="small secondary" onclick="manualAttend('${st.id}')">Jelen</button>`}`;box.appendChild(d)})
+ c.students.filter(st=>!q||st.name.toLowerCase().includes(q)||st.code.toLowerCase().includes(q)).slice(0,12).forEach(st=>{const a=s.attendance[st.id],d=document.createElement("div");d.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #eee";d.innerHTML=`<span><b>${esc(st.name)}</b> <span class="mono">${esc(st.code)}</span>${a?" ✓":""}</span>${a?`<button class="small danger" onclick="removeAttendance('${st.id}')">${currentLang==="en"?"Undo":"Visszavonás"}</button>`:`<button class="small secondary" onclick="manualAttend('${st.id}')">${currentLang==="en"?"Present":"Jelen"}</button>`}`;box.appendChild(d)})
 }
-async function startScanner(){
- if(!activeSession()){msg("Előbb nyiss meg egy alkalmat.","warn");return}
- if(!("BarcodeDetector" in window)){msg("A böngésző nem támogatja a beépített QR-olvasót. Android Chrome/Edge ajánlott. A kézi jelenlét ettől működik.","bad","scanMsg");return}
- try{detector=new BarcodeDetector({formats:["qr_code"]});stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});const v=document.getElementById("video");v.srcObject=stream;await v.play();document.getElementById("videoWrap").style.display="block";document.getElementById("startScanBtn").disabled=true;document.getElementById("stopScanBtn").disabled=false;scanLoop()}catch(e){msg("Kamera nem indítható. Telefonon HTTPS vagy localhost szükséges lehet. "+e.message,"bad","scanMsg")}
+async function startScanner(isResume=false){
+ if(!activeSession()){scannerRequested=false;msg(currentLang==="en"?"Open a session first.":"Előbb nyiss meg egy alkalmat.","warn");return}
+ scannerRequested=true;
+ if(scannerRestarting)return;
+ if(!("BarcodeDetector" in window)){scannerRequested=false;msg(currentLang==="en"?"This browser does not support the built-in QR scanner. Android Chrome/Edge is recommended. Manual attendance still works.":"A böngésző nem támogatja a beépített QR-olvasót. Android Chrome/Edge ajánlott. A kézi jelenlét ettől működik.","bad","scanMsg");return}
+ try{
+  scannerRestarting=true;
+  if(stream)stopScanner(true);
+  detector=new BarcodeDetector({formats:["qr_code"]});
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
+  const v=document.getElementById("video");v.srcObject=stream;await v.play();
+  document.getElementById("videoWrap").style.display="block";
+  document.getElementById("startScanBtn").disabled=true;document.getElementById("stopScanBtn").disabled=false;
+  scannerRestarting=false;scanLoop();
+  if(isResume)msg(currentLang==="en"?"QR scanner resumed.":"QR-szkenner újraindítva.","ok","scanMsg");
+ }catch(e){
+  scannerRestarting=false;scannerRequested=false;
+  msg((currentLang==="en"?"Camera could not be started. HTTPS or localhost may be required. ":"Kamera nem indítható. Telefonon HTTPS vagy localhost szükséges lehet. ")+e.message,"bad","scanMsg")
+ }
 }
-async function scanLoop(){if(!stream||!detector)return;try{const codes=await detector.detect(document.getElementById("video"));if(codes.length){const val=(codes[0].rawValue||"").trim(),n=Date.now();if(val&&(val!==lastScan.value||n-lastScan.at>2500)){lastScan={value:val,at:n};markAttendanceByCode(val,"QR")}}}catch(e){}scanTimer=setTimeout(scanLoop,220)}
-function stopScanner(){if(scanTimer)clearTimeout(scanTimer);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;detector=null;document.getElementById("videoWrap").style.display="none";document.getElementById("startScanBtn").disabled=false;document.getElementById("stopScanBtn").disabled=true}
+async function scanLoop(){
+ if(!stream||!detector)return;
+ try{const codes=await detector.detect(document.getElementById("video"));if(codes.length){const val=(codes[0].rawValue||"").trim(),n=Date.now();if(val&&(val!==lastScan.value||n-lastScan.at>2500)){lastScan={value:val,at:n};markAttendanceByCode(val,"QR")}}}catch(e){}
+ scanTimer=setTimeout(scanLoop,220)
+}
+function stopScanner(keepRequested=false){
+ if(scanTimer)clearTimeout(scanTimer);scanTimer=null;
+ if(stream)stream.getTracks().forEach(t=>t.stop());
+ const v=document.getElementById("video");if(v)v.srcObject=null;
+ stream=null;detector=null;
+ document.getElementById("videoWrap").style.display="none";
+ document.getElementById("startScanBtn").disabled=false;document.getElementById("stopScanBtn").disabled=true;
+ if(!keepRequested)scannerRequested=false;
+}
+async function recoverScanner(){
+ if(!scannerRequested||!activeSession()||scannerRestarting)return;
+ stopScanner(true);
+ await new Promise(r=>setTimeout(r,250));
+ if(document.visibilityState==="visible"&&scannerRequested)startScanner(true);
+}
+document.addEventListener("visibilitychange",()=>{
+ if(document.visibilityState==="hidden"){
+  if(stream){scannerRequested=true;stopScanner(true)}
+ }else if(scannerRequested){recoverScanner()}
+});
+window.addEventListener("pageshow",()=>{if(scannerRequested)recoverScanner()});
+window.addEventListener("focus",()=>{if(scannerRequested&&document.visibilityState==="visible"&&!stream)recoverScanner()});
 
 /* SEMESTER */
-function sessionHeader(s){return `${s.date}${s.label?" "+s.label:""}`}
+function sessionHeader(s){return [s.date||"",s.label||""].filter(Boolean).join(" ")||(currentLang==="en"?"Session":"Alkalom")}
 function renderSemester(){
- const t=document.getElementById("semesterTable"),c=activeCourse();t.innerHTML="";if(!c){t.innerHTML="<tr><td>Nincs kiválasztott kurzus.</td></tr>";return}
+ const t=document.getElementById("semesterTable"),c=activeCourse();t.innerHTML="";if(!c){t.innerHTML=`<tr><td>${currentLang==="en"?"No course selected.":"Nincs kiválasztott kurzus."}</td></tr>`;return}
  const sessions=[...c.sessions].sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
- const thead=document.createElement("thead"),hr=document.createElement("tr");hr.innerHTML="<th>Név</th><th>Neptun</th>"+sessions.map(s=>`<th title="${esc(s.start||"")}">${esc(sessionHeader(s))}</th>`).join("")+"<th>Jelenlét</th>";thead.appendChild(hr);t.appendChild(thead);
+ const thead=document.createElement("thead"),hr=document.createElement("tr");hr.innerHTML=`<th>${currentLang==="en"?"Name":"Név"}</th><th>${currentLang==="en"?"Student ID":"Neptun"}</th>`+sessions.map(s=>`<th title="${esc(s.start||"")}">${esc(sessionHeader(s))}</th>`).join("")+`<th>${currentLang==="en"?"Attendance":"Jelenlét"}</th>`;thead.appendChild(hr);t.appendChild(thead);
  const tb=document.createElement("tbody");
  c.students.forEach(st=>{let count=0;const cells=sessions.map(s=>{const a=s.attendance[st.id];if(a)count++;return `<td>${a?`✓ ${esc(a.time)}${a.method==="kézi"?" (K)":""}`:"–"}</td>`}).join("");const tr=document.createElement("tr");tr.innerHTML=`<td>${esc(st.name)}</td><td class="mono">${esc(st.code)}</td>${cells}<td>${count}/${sessions.length}</td>`;tb.appendChild(tr)});
- t.appendChild(tb)
+ t.appendChild(tb);applyLanguage()
 }
 function csvQuote(v){return `"${String(v??"").replace(/"/g,'""')}"`}
 function exportSemesterCSV(){
  const c=activeCourse();if(!c){msg("Nincs kurzus.","warn");return}
  const sessions=[...c.sessions].sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
- const rows=[["Név","Neptun",...sessions.map(s=>sessionHeader(s)),"Jelenlétek száma"]];
+ const rows=[[currentLang==="en"?"Name":"Név",currentLang==="en"?"Student ID":"Neptun",...sessions.map(s=>sessionHeader(s)),currentLang==="en"?"Attendance count":"Jelenlétek száma"]];
  c.students.forEach(st=>{let count=0;const vals=sessions.map(s=>{const a=s.attendance[st.id];if(!a)return "";count++;return `${a.time} [${a.method}]`});rows.push([st.name,st.code,...vals,`${count}/${sessions.length}`])});
  const text="\uFEFF"+rows.map(r=>r.map(csvQuote).join(";")).join("\r\n"),blob=new Blob([text],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`jelenlet_${safe(c.name)}_${safe(c.term||"felev")}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
 }
@@ -425,12 +589,14 @@ function backupAll(){
  const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`qr_jelenlet_teljes_mentes_${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
 }
 document.getElementById("restoreFile").addEventListener("change",e=>{
- const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x||!Array.isArray(x.courses))throw new Error("Érvénytelen mentés.");if(!confirm("A visszatöltés lecseréli a böngészőben lévő jelenlegi adatokat. Folytatod?"))return;db=x;currentSessionId=null;save();renderAll();msg("Mentés visszatöltve.","ok")}catch(err){msg("Hiba: "+err.message,"bad")}};r.readAsText(file);e.target.value=""
+ const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x||!Array.isArray(x.courses))throw new Error("Érvénytelen mentés.");if(!confirm(currentLang==="en"?"Restoring will replace the current data stored in this browser. Continue?":"A visszatöltés lecseréli a böngészőben lévő jelenlegi adatokat. Folytatod?"))return;db=x;currentSessionId=null;migrateDB();save();renderAll();msg(currentLang==="en"?"Backup restored.":"Mentés visszatöltve.","ok")}catch(err){msg("Hiba: "+err.message,"bad")}};r.readAsText(file);e.target.value=""
 });
 
-window.addEventListener("beforeunload",stopScanner);
+window.addEventListener("beforeunload",()=>stopScanner(false));
 load();
+document.getElementById("languageSelect").value=currentLang;
 showTab("attendance");
+applyLanguage();
 </script>
 
 <script>
@@ -454,7 +620,7 @@ window.addEventListener("appinstalled", () => {
 });
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+    navigator.serviceWorker.register("./service-worker.js").then(r=>r.update()).catch(()=>{});
   });
 }
 </script>

@@ -6,12 +6,18 @@
   "display": "standalone",
   "background_color": "#f4f6f8",
   "theme_color": "#111827",
-  "description": "Kurzusonkénti QR-kódos féléves jelenléti nyilvántartó.",
+  "description": "Egyszerű, offline QR-kódos jelenléti nyilvántartó.",
   "icons": [
     {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
