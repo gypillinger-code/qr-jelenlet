@@ -1,5 +1,5 @@
 
-const CACHE = "qr-jelenlet-v3";
+const CACHE = "qr-jelenlet-v2-pipa-20261103";
 const ASSETS = [
   "./",
   "./index.html",
@@ -25,13 +25,12 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   event.respondWith(
-    fetch(event.request).then(response => {
-      if (response.ok) {
+    caches.match(event.request).then(cached =>
+      cached || fetch(event.request).then(response => {
         const copy = response.clone();
         caches.open(CACHE).then(cache => cache.put(event.request, copy));
-      }
-      return response;
-    }).catch(() => caches.match(event.request).then(cached => cached || caches.match("./index.html")))
+        return response;
+      }).catch(() => caches.match("./index.html"))
     )
   );
 });

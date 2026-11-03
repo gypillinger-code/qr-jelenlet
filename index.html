@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>QR Jelenlét v3 – féléves nyilvántartó</title>
+<title>QR Jelenlét – féléves nyilvántartó</title>
 <style>
 :root{
  --bg:#f4f6f8;--card:#fff;--text:#17212b;--muted:#667085;--line:#d0d5dd;
@@ -65,9 +65,8 @@ th{font-size:12px;color:var(--muted);background:#fff;position:sticky;top:0;z-ind
 <body>
 <header>
  <div class="headerrow">
-   <h1>QR Jelenlét v3 – féléves nyilvántartó</h1>
+   <h1>QR Jelenlét – féléves nyilvántartó</h1>
    <select id="courseSelect" onchange="switchCourse(this.value)"></select>
-   <button class="secondary small" onclick="showTab('courses')">Kurzusok</button>
    <button id="installBtn" class="secondary small hidden">📱 Telepítés</button>
  </div>
 </header>
@@ -363,16 +362,7 @@ function createSession(){
 }
 function renderSessionSelect(){
  const sel=document.getElementById("sessionSelect");sel.innerHTML='<option value="">– válassz –</option>';const c=activeCourse();if(!c)return;
- const sessions=[...c.sessions].sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
- // The first session without recorded attendance is a suggestion, never an automatic selection.
- const next=sessions.find(s=>!s.attendance||Object.keys(s.attendance).length===0);
- [...sessions].reverse().forEach(s=>{
-  const o=document.createElement("option");o.value=s.id;
-  const hasAttendance=s.attendance&&Object.keys(s.attendance).length>0;
-  const status=s.id===next?.id?"🟢 KÖVETKEZŐ – ":hasAttendance?"✓ Rögzített – ":"○ Üres – ";
-  o.textContent=status+`${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;
-  o.selected=s.id===currentSessionId;sel.appendChild(o)
- })
+ [...c.sessions].sort((a,b)=>(b.date+b.start).localeCompare(a.date+a.start)).forEach(s=>{const o=document.createElement("option");o.value=s.id;const recorded=s.attendance&&Object.keys(s.attendance).length>0;o.textContent=`${recorded?"✓":"○"} ${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;o.selected=s.id===currentSessionId;sel.appendChild(o)})
 }
 function openSession(sid){currentSessionId=sid||null;stopScanner();renderAttendance()}
 function closeSessionView(){currentSessionId=null;stopScanner();document.getElementById("sessionSelect").value="";renderAttendance()}
@@ -390,6 +380,7 @@ function manualAttend(sid){
 }
 function removeAttendance(sid){const s=activeSession();if(!s)return;delete s.attendance[sid];save();renderAttendance();renderManualSearch()}
 function renderAttendance(){
+ renderSessionSelect();
  const area=document.getElementById("activeSessionArea"),b=document.getElementById("attendanceBody");b.innerHTML="";const c=activeCourse(),s=activeSession();
  area.classList.toggle("hidden",!c||!s);if(!c||!s)return;
  document.getElementById("activeSessionTitle").textContent=`${c.name} – ${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;
