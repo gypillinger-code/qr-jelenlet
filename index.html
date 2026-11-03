@@ -67,6 +67,7 @@ th{font-size:12px;color:var(--muted);background:#fff;position:sticky;top:0;z-ind
  <div class="headerrow">
    <h1>QR Jelenlét – féléves nyilvántartó</h1>
    <select id="courseSelect" onchange="switchCourse(this.value)"></select>
+   <button class="secondary small" onclick="showTab('courses')">Kurzusok</button>
    <button id="installBtn" class="secondary small hidden">📱 Telepítés</button>
  </div>
 </header>
@@ -362,7 +363,7 @@ function createSession(){
 }
 function renderSessionSelect(){
  const sel=document.getElementById("sessionSelect");sel.innerHTML='<option value="">– válassz –</option>';const c=activeCourse();if(!c)return;
- [...c.sessions].sort((a,b)=>(b.date+b.start).localeCompare(a.date+a.start)).forEach(s=>{const o=document.createElement("option");o.value=s.id;const recorded=s.attendance&&Object.keys(s.attendance).length>0;o.textContent=`${recorded?"✓":"○"} ${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;o.selected=s.id===currentSessionId;sel.appendChild(o)})
+ [...c.sessions].sort((a,b)=>(b.date+b.start).localeCompare(a.date+a.start)).forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=`${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;o.selected=s.id===currentSessionId;sel.appendChild(o)})
 }
 function openSession(sid){currentSessionId=sid||null;stopScanner();renderAttendance()}
 function closeSessionView(){currentSessionId=null;stopScanner();document.getElementById("sessionSelect").value="";renderAttendance()}
@@ -380,7 +381,6 @@ function manualAttend(sid){
 }
 function removeAttendance(sid){const s=activeSession();if(!s)return;delete s.attendance[sid];save();renderAttendance();renderManualSearch()}
 function renderAttendance(){
- renderSessionSelect();
  const area=document.getElementById("activeSessionArea"),b=document.getElementById("attendanceBody");b.innerHTML="";const c=activeCourse(),s=activeSession();
  area.classList.toggle("hidden",!c||!s);if(!c||!s)return;
  document.getElementById("activeSessionTitle").textContent=`${c.name} – ${s.date} ${s.start||""}${s.label?" – "+s.label:""}`;

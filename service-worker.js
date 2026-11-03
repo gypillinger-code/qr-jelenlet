@@ -1,12 +1,10 @@
 
-const CACHE = "qr-jelenlet-v2-pipa-20261103";
+const CACHE = "qr-jelenlet-v1";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./icon.svg",
-  "./icon-192.png",
-  "./icon-512.png"
+  "./icon.svg"
 ];
 
 self.addEventListener("install", event => {
